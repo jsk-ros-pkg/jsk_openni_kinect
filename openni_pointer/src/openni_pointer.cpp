@@ -1,6 +1,7 @@
 // openni_pointer.cpp
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <std_msgs/UInt8.h>
 #include <tf/transform_broadcaster.h>
 
 #include <XnOpenNI.h>
@@ -22,6 +23,7 @@ XnVFlowRouter *g_pFlowRouter;
 
 //
 ros::Publisher hand_point_pub_;
+ros::Publisher hand_point_status_pub_;
 
 typedef enum
 {
@@ -184,6 +186,7 @@ int main (int argc, char **argv)
     ros::NodeHandle nh;
 
     hand_point_pub_ = nh.advertise<geometry_msgs::PointStamped>("hand_position",10);
+    hand_point_status_pub_ = nh.advertise<std_msgs::UInt8>("hand_position/status",10);
 
     // Initialize OpenNI
     string configFilename = ros::package::getPath ("openni_pointer") + "/openni_pointer.xml";
@@ -232,6 +235,9 @@ int main (int argc, char **argv)
             ROS_INFO ("Raise your hand for it to be identified, or perform click or wave gestures");
             break;
         }
+	std_msgs::UInt8 msg;
+	msg.data = g_SessionState;
+	hand_point_status_pub_.publish(msg);
 
         //publishTransforms();
         r.sleep ();
