@@ -1,9 +1,11 @@
 // ros
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <std_msgs/UInt8.h>
 #include <std_msgs/String.h>
 
 ros::Publisher swipe_pub;
+ros::Publisher swipe_status_pub;
 //
 
 //NITE
@@ -11,29 +13,27 @@ ros::Publisher swipe_pub;
 #include <XnCppWrapper.h>
 #include <XnVHandPointContext.h>
 #include <XnVSessionManager.h>
-#include <XnVFlowRouter.h>
 #include <XnVSwipeDetector.h>
 #include <XnVSteadyDetector.h>
+#include <XnVPushDetector.h>
+#include <XnVWaveDetector.h>
 
-#include "signal_catch.h"
-
+// NITE objects
 XnVSessionManager* g_pSessionManager = NULL;
-XnVFlowRouter* g_pMainFlowRouter;
+XnVSwipeDetector*  g_pSwipeDetector;
+XnVPushDetector*   g_pPushDetector;
+XnVWaveDetector*   g_pWaveDetector;
+XnVSteadyDetector* g_pSteadyDetector;
 
-XnVSwipeDetector* m_pSwipeDetector;
-XnVSteadyDetector* m_pSteadyDetector;
-
-XnBool g_bInSession = false;
-XnFloat g_fValue = 0.5f;
+typedef enum
+{
+    IN_SESSION,
+    NOT_IN_SESSION,
+    QUICK_REFOCUS
+} SessionState;
+SessionState g_SessionState = NOT_IN_SESSION;
 
 xn::Context g_Context;
-xn::DepthGenerator g_DepthGenerator;
-
-XnBool g_bQuit = false;
-
-// Change flow state between steady and swipe
-void SetSteadyActive() {g_pMainFlowRouter->SetActive(m_pSteadyDetector);}
-void SetSwipeActive() {g_pMainFlowRouter->SetActive(m_pSwipeDetector);}
 
 void Publish_String(std::string str){
   std_msgs::String msg;
@@ -46,37 +46,33 @@ void Publish_String(std::string str){
 void XN_CALLBACK_TYPE Swipe_SwipeUp(XnFloat fVelocity, XnFloat fAngle, void* cxt)
 {
   Publish_String("Up");
-
-  SetSteadyActive();
 }
 
 void XN_CALLBACK_TYPE Swipe_SwipeDown(XnFloat fVelocity, XnFloat fAngle, void* cxt)
 {
   Publish_String("Down");
-
-  SetSteadyActive();
 }
 
 void XN_CALLBACK_TYPE Swipe_SwipeLeft(XnFloat fVelocity, XnFloat fAngle, void* cxt)
 {
   Publish_String("Left");
-
-  SetSteadyActive();
 }
 
 void XN_CALLBACK_TYPE Swipe_SwipeRight(XnFloat fVelocity, XnFloat fAngle, void* cxt)
 {
   Publish_String("Right");
-
-  SetSteadyActive();
 }
 
 // Steady detector
 void XN_CALLBACK_TYPE Steady_OnSteady(XnUInt32 nId, XnFloat fVelocity, void* cxt)
 {
-  ROS_INFO("Steady [%d]", nId);
+  Publish_String("Standby");
+}
 
-  SetSwipeActive();
+// Push detector
+void XN_CALLBACK_TYPE Push_OnPush(XnFloat fVelocity, XnFloat fAngle, void* cxt)
+{
+  Publish_String("Push");
 }
 
 void CleanupExit()
@@ -86,9 +82,8 @@ void CleanupExit()
     g_pSessionManager = NULL;
   }
 
-  delete g_pMainFlowRouter;
-  delete m_pSwipeDetector;
-  delete m_pSteadyDetector;
+  delete g_pSwipeDetector;
+  delete g_pSteadyDetector;
 
   g_Context.Shutdown();
 
@@ -97,15 +92,20 @@ void CleanupExit()
 
 void XN_CALLBACK_TYPE SessionStart(const XnPoint3D& pFocus, void* UserCxt)
 {
-  ROS_INFO("hand swipe detect start");
-  g_bInSession = true;
-  g_pMainFlowRouter->SetActive(m_pSteadyDetector);
+  ROS_INFO("hand gesture detection start");
+  g_SessionState = IN_SESSION;
 }
 
 void XN_CALLBACK_TYPE SessionEnd(void* UserCxt)
 {
-  g_bInSession = false;
-  g_pMainFlowRouter->SetActive(NULL);
+  ROS_INFO("hand gesture detection end");
+  g_SessionState = NOT_IN_SESSION;
+}
+
+void XN_CALLBACK_TYPE NoHands (void *UserCxt)
+{
+  printf ("Quick refocus\n");
+  g_SessionState = QUICK_REFOCUS;
 }
 
 #define CHECK_RC(rc, what)                                      \
@@ -130,6 +130,7 @@ int main(int argc, char **argv)
   ros::NodeHandle nh;
 
   swipe_pub = nh.advertise<std_msgs::String>("swipe",10);
+  swipe_status_pub = nh.advertise<std_msgs::UInt8>("swipe/status",10);
 
   XnStatus rc = XN_STATUS_OK;
   xn::EnumerationErrors errors;
@@ -138,8 +139,6 @@ int main(int argc, char **argv)
   rc = g_Context.InitFromXmlFile(configfile.c_str());
   CHECK_ERRORS(rc, errors, "InitFromXmlFile");
   CHECK_RC(rc, "InitFromXml");
-  rc = g_Context.FindExistingNode(XN_NODE_TYPE_DEPTH, g_DepthGenerator);
-  CHECK_RC(rc, "Find depth generator");
 
   // Create and initialize point tracker
   g_pSessionManager = new XnVSessionManager;
@@ -152,35 +151,53 @@ int main(int argc, char **argv)
 	}
   g_pSessionManager->RegisterSession(NULL, &SessionStart, &SessionEnd);
 
-  // Start catching signals for quit indications
-  CatchSignals(&g_bQuit);
-
-  m_pSwipeDetector = new XnVSwipeDetector;
-  m_pSteadyDetector = new XnVSteadyDetector;
+  g_pSwipeDetector = new XnVSwipeDetector;
+  g_pSteadyDetector = new XnVSteadyDetector;
+  g_pPushDetector = new XnVPushDetector;
+  g_pWaveDetector = new XnVWaveDetector;
 
   // Swipe
-  m_pSwipeDetector->RegisterSwipeUp(NULL, &Swipe_SwipeUp);
-  m_pSwipeDetector->RegisterSwipeDown(NULL, &Swipe_SwipeDown);
-  m_pSwipeDetector->RegisterSwipeLeft(NULL, &Swipe_SwipeLeft);
-  m_pSwipeDetector->RegisterSwipeRight(NULL, &Swipe_SwipeRight);
+  g_pSwipeDetector->RegisterSwipeUp(NULL, &Swipe_SwipeUp);
+  g_pSwipeDetector->RegisterSwipeDown(NULL, &Swipe_SwipeDown);
+  g_pSwipeDetector->RegisterSwipeLeft(NULL, &Swipe_SwipeLeft);
+  g_pSwipeDetector->RegisterSwipeRight(NULL, &Swipe_SwipeRight);
   // Steady
-  m_pSteadyDetector->RegisterSteady(NULL, &Steady_OnSteady);
-
-  // Creat the flow manager
-  g_pMainFlowRouter = new XnVFlowRouter;
+  g_pSteadyDetector->RegisterSteady(NULL, &Steady_OnSteady);
+  // Push
+  g_pPushDetector->RegisterPush(NULL, &Push_OnPush);
 
   // Connect flow manager to the point tracker
-  g_pSessionManager->AddListener(g_pMainFlowRouter);
+  g_pSessionManager->AddListener(g_pSwipeDetector);
+  g_pSessionManager->AddListener(g_pSteadyDetector);
+  g_pSessionManager->AddListener(g_pPushDetector);
 
   g_Context.StartGeneratingAll();
   ros::Rate r (30);
   while (ros::ok ()){
     // Read next available data
-    g_Context.WaitOneUpdateAll(g_DepthGenerator);
+    //g_Context.WaitOneUpdateAll(g_DepthGenerator);
+    g_Context.WaitAndUpdateAll();
 
     // Process the data
     g_pSessionManager->Update(&g_Context);
-    
+
+    switch (g_SessionState)
+    {
+    case IN_SESSION:
+	break;
+    case NOT_IN_SESSION:
+	ROS_INFO ("Perform wave gestures to track hand");
+	break;
+    case QUICK_REFOCUS:
+	ROS_INFO ("Raise your hand for it to be identified");
+	break;
+    }
+    std_msgs::UInt8 msg;
+    msg.data = g_SessionState;
+    swipe_status_pub.publish(msg);
+
+    // ros sleep
+    r.sleep();
   }
   CleanupExit();
 }
