@@ -1,0 +1,15 @@
+<package>
+  <description brief="kinect_near_mode_calibration">
+
+     kinect_near_mode_calibration
+
+  </description>
+  <author>Atushi Tsuda (tsuda@jsk.t.u-tokyo.ac.jp), Kei Okada(k-okada@jsk.t.u-tokyo.ac.jp)</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/kinect_near_mode_calibration</url>
+  <depend package="kinect_calibration"/>
+
+</package>
+
+
