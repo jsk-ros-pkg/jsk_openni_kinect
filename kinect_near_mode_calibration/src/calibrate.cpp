@@ -154,7 +154,7 @@ void writeCalibration(FILE *f, const cv::Mat& cameraMatrix, const cv::Mat& distC
 
 #define RADIUS 260
 
-void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, float baseline, float shift_offset, float R = 1, float U = 0, float V = 0) {
+void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, float baseline, float shift_offset, float D = 1, float U = 0, float V = 0) {
   FILE *f = fopen(fname, "w");
   fprintf(f, "# .PCD v.7 - Point Cloud Data file format\n");
   fprintf(f, "VERSION .7\n");
@@ -170,7 +170,7 @@ void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, fl
 
   for (int v = 0; v < depth.rows; v++) { // y
     for (int u = 0; u < depth.cols; u++) { // x
-      float disparity = SHIFT_SCALE * ( shift_offset - (depth.at<uint16_t>(cv::Point2f(u,v)) * R + (u-cx)*(u-cx)*U + (v-cy)*(v-cy)*V) );
+      float disparity = D*SHIFT_SCALE*(shift_offset-depth.at<uint16_t>(cv::Point2f(u,v))) + U*(u-cx)*(u-cx) + V*(v-cy)*(v-cy);
       if ( disparity <= 0 ) {
         fprintf(f, "%f %f %f\n", 0.0f, 0.0f, 0.0f);
       } else {
@@ -226,6 +226,12 @@ void undistort_nearest(Mat img, Mat &imgRect, Mat camMatrix, Mat distCoeffs) {
                                map1_part.type(), map1_part, map2_part );
       remap( src, dst_part, map1_part, map2_part, INTER_NEAREST, BORDER_CONSTANT );
     }
+}
+
+double apply_fitting_param_to_kd(double kd, double u, double v, double shift_offset, double D, double U, double V)
+{
+  double disp_fitted = D*SHIFT_SCALE*(shift_offset-kd) + U*u*u + V*v*v;
+  return( shift_offset - (disp_fitted/SHIFT_SCALE) );
 }
 
 // 
@@ -417,22 +423,22 @@ main(int argc, char **argv)
   double prev_A = 0, prev_B = 0;
 
   // calibrate projector distortion
-  double z = 1, U = 0, V = 0;
-  double prev_z = 0, prev_U = 0, prev_V = 0;
+  double dd = 1, U = 0, V = 0;
+  double prev_dd = 0, prev_U = 0, prev_V = 0;
 
-  double thr_A = 1, thr_B = 1, thr_z = 0.01, thr_U = 0.001, thr_V = 0.001;
+  double thr_A = 1, thr_B = 1, thr_dd = 0.01, thr_U = 1e-5, thr_V = 1e-5;
 
   std::vector<double> ls_src2_buf = ls_src2; //buffer
 
   while ( (abs(A - prev_A) > thr_A)
           || (abs(B - prev_B) > thr_B)
-          || (abs(z - prev_z) > thr_z)
+          || (abs(dd - prev_dd) > thr_dd)
           || (abs(U - prev_U) > thr_U)
           || (abs(V - prev_V) > thr_V) ){
 
     prev_A = A;
     prev_B = B;
-    prev_z = z;
+    prev_dd = dd;
     prev_U = U;
     prev_V = V;
 
@@ -442,7 +448,7 @@ main(int argc, char **argv)
       double r = ls_src2_buf[i]/Z;
       double u = ls_src3[i].x - camMatrix.at<double>(0,2);
       double v = ls_src3[i].y - camMatrix.at<double>(1,2);
-      ls_src2[i] = (r*z + U*u*u + V*v*v)*Z;
+      ls_src2[i] = apply_fitting_param_to_kd(r, u, v, B, dd, U, V) * Z;
     }
     
     {
@@ -477,35 +483,37 @@ main(int argc, char **argv)
 
     std::vector<cv::Vec3d> ls_src10;
     std::vector<double> ls_src11;
+    double f = camMatrix.at<double>(0,0);
 
     for(unsigned int i = 0; i < ls_src2.size() ; i++){
       double Z = ls_src1[i][1];
       double r = ls_src2[i]/Z;
       double u = ls_src3[i].x - camMatrix.at<double>(0,2);
       double v = ls_src3[i].y - camMatrix.at<double>(1,2);
-      ls_src10.push_back(cv::Vec3d(r, u*u, v*v));
-      ls_src11.push_back(B - A / Z);
+      ls_src10.push_back(cv::Vec3d( (SHIFT_SCALE * (B-r)), u*u, v*v));
+      ls_src11.push_back(b*f/Z);
     }
     cv::Mat depth_params;
     double rp_err1 = 0, rp_err2 = 0;
     if (cv::solve(cv::Mat(ls_src10).reshape(1), cv::Mat(ls_src11), depth_params,
                   DECOMP_LU | DECOMP_NORMAL)) {
-      z = depth_params.at<double>(0);
+      dd = depth_params.at<double>(0);
       U = depth_params.at<double>(1);
       V = depth_params.at<double>(2);
-      std::cerr << "z = " << z << ", U = " << U << ", V = " << V << std::endl;
+      std::cerr << "D = " << dd << ", U = " << U << ", V = " << V << std::endl;
 
       for(unsigned int i = 0; i < ls_src2.size() ; i++){
         double Z = ls_src1[i][1];
         double r = ls_src2[i]/Z;
+        double r_buf = ls_src2_buf[i]/Z;
         double u = ls_src3[i].x - camMatrix.at<double>(0,2);
         double v = ls_src3[i].y - camMatrix.at<double>(1,2);
-        rp_err1 += fabs(Z + A / (r - B));
-        rp_err2 += fabs(Z + A / ( (z * r + U*u*u + V*v*v) - B) );
+        rp_err1 += fabs(Z + A / (r_buf - B));
+        rp_err2 += fabs(Z + b*f/((SHIFT_SCALE*(r-B))+U*u*u+V*v*v) );
       }
       rp_err1 /= ls_src2.size();
       rp_err2 /= ls_src2.size();
-      printf("\nReprojection error = from %f to %f\n\n", rp_err1, rp_err2);
+      printf("\nReprojection error will change from %f to %f by hyperboloid fitting\n\n", rp_err1, rp_err2);
     }
   }
 
@@ -662,10 +670,10 @@ main(int argc, char **argv)
             "depth_rgb_translation: [ %.6f, %.6f, %.6f ]\n", dptr[0], dptr[1], dptr[2]);
     fprintf(params_file,
             "projector_coefficients:\n"
-            "    x_coeff: %.8e\n"
-            "    y_coeff: %.8e\n"
-            "    z_coeff: %.8f\n",
-            U, V, z);
+            "    u_coeff: %.8e\n"
+            "    v_coeff: %.8e\n"
+            "    disp_coeff: %.8f\n",
+            U, V, dd);
     printf("Wrote additional calibration parameters to %s\n", params_fname);
   }
   
@@ -806,7 +814,7 @@ main(int argc, char **argv)
                camMatrix.at<double>(1,1), // focal length
                b,      // baseline
                B,      // shift offset
-               z, U, V // projector parameters
+               dd, U, V // projector parameters
                );
       fnum++;
     }
