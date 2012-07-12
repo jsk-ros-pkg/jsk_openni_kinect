@@ -31,3 +31,6 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 rosbuild_add_executable(calibrate src/calibrate.cpp)
 rosbuild_add_executable(plot_data src/plot_data.cpp)
+
+rosbuild_find_ros_package("jsk_tools")
+execute_process(COMMAND cmake -E chdir ${PROJECT_SOURCE_DIR} python ${jsk_tools_PACKAGE_PATH}/bin/launchdoc-generator.py ${PROJECT_NAME} --output_dir=. --nomakefile RESULT_VARIABLE _make_failed)

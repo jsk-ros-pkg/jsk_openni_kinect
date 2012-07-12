@@ -9,6 +9,11 @@
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/kinect_near_mode_calibration</url>
   <depend package="kinect_calibration"/>
+  <depend package="jsk_tools"/>
+
+  <export>
+    <rosdoc config="rosdoc.yaml"/>
+  </export>
 
 </package>
 
