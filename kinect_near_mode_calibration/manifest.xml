@@ -11,6 +11,9 @@
 
   <depend package="opencv2"/>
   <depend package="eigen"/>
+  <depend package="image_view_jsk_patch"/>
+  <depend package="checkerboard_detector"/>
+  <depend package="openni_camera"/>
   <depend package="jsk_tools"/>
 
   <export>

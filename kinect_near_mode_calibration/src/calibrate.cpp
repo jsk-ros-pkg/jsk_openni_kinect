@@ -33,6 +33,7 @@
  *********************************************************************/
 
 /**
+
    Based on kinect_calibration (Kurt Konolige, Patrick Mihelich)
    \author Atsushi Tsuda, Kei Okada
 
@@ -152,9 +153,7 @@ void writeCalibration(FILE *f, const cv::Mat& cameraMatrix, const cv::Mat& distC
           K[0], K[1], K[2], K[3], K[4], K[5], K[6], K[7], K[8]);
 }
 
-#define RADIUS 260
-
-void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, float baseline, float shift_offset, float D = 1, float U = 0, float V = 0) {
+void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, float R = 1, float U = 0, float V = 0) {
   FILE *f = fopen(fname, "w");
   fprintf(f, "# .PCD v.7 - Point Cloud Data file format\n");
   fprintf(f, "VERSION .7\n");
@@ -170,13 +169,15 @@ void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, fl
 
   for (int v = 0; v < depth.rows; v++) { // y
     for (int u = 0; u < depth.cols; u++) { // x
-      float disparity = D*SHIFT_SCALE*(shift_offset-depth.at<uint16_t>(cv::Point2f(u,v))) + U*(u-cx)*(u-cx) + V*(v-cy)*(v-cy);
-      if ( disparity <= 0 ) {
+      double r = depth.at<uint16_t>(cv::Point2f(u,v));
+      if ( (r < 1) || (5000 < r) ) {
         fprintf(f, "%f %f %f\n", 0.0f, 0.0f, 0.0f);
       } else {
-        float z = fx * baseline / disparity * 0.001;
-        float x = (u - cx) / fx * z;
-        float y = (v - cy) / fy * z;
+        float uu = u - cx;
+        float vv = v - cy;
+        float z = r*R + U*uu*uu + V*vv*vv;
+        float x = uu / fx * z;
+        float y = vv / fy * z;
         fprintf(f, "%f %f %f\n", x, y, z);
       }
     }
@@ -199,7 +200,7 @@ void pcdwrite_chessboard(char *fname, vector<cv::Vec3f> patterns) {
   fprintf(f, "DATA ascii\n");
 
   for (unsigned int i = 0; i < patterns.size(); i++ ) {
-	fprintf(f, "%f %f %f\n", patterns[i][0]*0.001, patterns[i][1]*0.001, patterns[i][2]*0.001);
+    fprintf(f, "%f %f %f\n", patterns[i][0], patterns[i][1], patterns[i][2]);
   }
   fclose(f);
 }
@@ -219,19 +220,13 @@ void undistort_nearest(Mat img, Mat &imgRect, Mat camMatrix, Mat distCoeffs) {
       int stripe_size = std::min( stripe_size0, src.rows - y );
       Ar(1, 2) = v0 - y;
       Mat map1_part = map1.rowRange(0, stripe_size),
-	    map2_part = map2.rowRange(0, stripe_size),
-	    dst_part = dst.rowRange(y, y + stripe_size);
+        map2_part = map2.rowRange(0, stripe_size),
+        dst_part = dst.rowRange(y, y + stripe_size);
 
       initUndistortRectifyMap( A, distCoeffs, I, Ar, Size(src.cols, stripe_size),
                                map1_part.type(), map1_part, map2_part );
       remap( src, dst_part, map1_part, map2_part, INTER_NEAREST, BORDER_CONSTANT );
     }
-}
-
-double apply_fitting_param_to_kd(double kd, double u, double v, double shift_offset, double D, double U, double V)
-{
-  double disp_fitted = D*SHIFT_SCALE*(shift_offset-kd) + U*u*u + V*v*v;
-  return( shift_offset - (disp_fitted/SHIFT_SCALE) );
 }
 
 // 
@@ -373,9 +368,8 @@ main(int argc, char **argv)
   // Read in depth images, fit readings to computed depths
   /// @todo Not checking that we actually got depth readings!
   fnum = 0;
-  std::vector<cv::Vec2d> ls_src1;
+  std::vector<cv::Vec3d> ls_src1;
   std::vector<double> ls_src2;
-  std::vector<cv::Point2f> ls_src3;
   while (1)
     {
       // Load raw depth readings
@@ -402,119 +396,46 @@ main(int argc, char **argv)
       rot3x3.copyTo(xfm_rot);
       tvec.reshape(1,3).copyTo(xfm_trans);
       cv::transform(pattern, world_points, xfm);
- 
+
+      double cx = camMatrix.at<double>(0,2);
+      double cy = camMatrix.at<double>(1,2);
+
       for (unsigned int j = 0; j < corners.size(); ++j) {
         double Z = world_points.at<cv::Vec3f>(j)[2];   // actual depth
         double r = img_depth_rect.at<uint16_t>(corners[j]); // sensor reading
-        if ( (r < 2047.0) // 2047 is invalid data
-             && (Z < 1.0) // use near data
-             ){
-          ls_src1.push_back(cv::Vec2d(-1.0, Z));
-          ls_src2.push_back(Z*r);
-          ls_src3.push_back(corners[j]);
+        double uu = corners[j].x - cx;
+        double vv = corners[j].y - cy;
+        if ( (0 < r) && (r < 5000) ){
+          ls_src1.push_back(cv::Vec3d(r, uu*uu, vv*vv));
+          ls_src2.push_back(Z*1000.0);
         }
       }
 
       fnum++;
     }
 
-  double A = 200, B = 1080;
-  double b; // baseline
-  double prev_A = 0, prev_B = 0;
-
-  // calibrate projector distortion
-  double dd = 1, U = 0, V = 0;
-  double prev_dd = 0, prev_U = 0, prev_V = 0;
-
-  double thr_A = 1, thr_B = 1, thr_dd = 0.01, thr_U = 1e-5, thr_V = 1e-5;
-
-  std::vector<double> ls_src2_buf = ls_src2; //buffer
-
-  while ( (abs(A - prev_A) > thr_A)
-          || (abs(B - prev_B) > thr_B)
-          || (abs(dd - prev_dd) > thr_dd)
-          || (abs(U - prev_U) > thr_U)
-          || (abs(V - prev_V) > thr_V) ){
-
-    prev_A = A;
-    prev_B = B;
-    prev_dd = dd;
-    prev_U = U;
-    prev_V = V;
-
-    // update sensor value with fitting params
-    for(unsigned int i = 0; i < ls_src2.size(); i++){
-      double Z = ls_src1[i][1];
-      double r = ls_src2_buf[i]/Z;
-      double u = ls_src3[i].x - camMatrix.at<double>(0,2);
-      double v = ls_src3[i].y - camMatrix.at<double>(1,2);
-      ls_src2[i] = apply_fitting_param_to_kd(r, u, v, B, dd, U, V) * Z;
-    }
-    
-    {
-      cv::Mat depth_params;
-      if (cv::solve(cv::Mat(ls_src1).reshape(1), cv::Mat(ls_src2), depth_params,
-                    DECOMP_LU | DECOMP_NORMAL)) {
-        A = depth_params.at<double>(0);
-        B = depth_params.at<double>(1);
-        double f = camMatrix.ptr<double>()[0];
-        b = SHIFT_SCALE * A / f;
-        printf("Reading to depth fitting parameters:\n"
-               "A = %f\n"
-               "B = %f\n"
-               "Baseline between projector and depth camera = %f\n\n",
-               A, B, b);
-        double rp_err = 0;
-        // -A + BZ = Zr, Z = -A/(r - B), r = -A/Z + B
-        for(unsigned int i = 0; i < ls_src2.size() ; i++){
-          double Z = ls_src1[i][1];
-          double r = ls_src2[i]/Z;
-          rp_err += abs(Z + A / ( r - B ));
-        }
-        rp_err /= ls_src2.size();
-        printf("\nReprojection error = %f\n\n", rp_err);
-        std::cerr << depth_params << std::endl;
-      }
-      else {
-        printf("**** Failed to solve least-squared problem ****\n");
-        return 1;
-      }
-    }
-
-    std::vector<cv::Vec3d> ls_src10;
-    std::vector<double> ls_src11;
-    double f = camMatrix.at<double>(0,0);
-
+  cv::Mat depth_params;
+  double zz, U, V;
+  if (cv::solve(cv::Mat(ls_src1).reshape(1), cv::Mat(ls_src2), depth_params,
+                DECOMP_LU | DECOMP_NORMAL)) {
+    zz = depth_params.at<double>(0);
+    U = depth_params.at<double>(1);
+    V = depth_params.at<double>(2);
+    double rp_err = 0;
     for(unsigned int i = 0; i < ls_src2.size() ; i++){
-      double Z = ls_src1[i][1];
-      double r = ls_src2[i]/Z;
-      double u = ls_src3[i].x - camMatrix.at<double>(0,2);
-      double v = ls_src3[i].y - camMatrix.at<double>(1,2);
-      ls_src10.push_back(cv::Vec3d( (SHIFT_SCALE * (B-r)), u*u, v*v));
-      ls_src11.push_back(b*f/Z);
+      double Z = ls_src2[i];
+      double r = ls_src1[i][0];
+      double uu = ls_src1[i][1];
+      double vv = ls_src1[i][2];
+      rp_err += abs( Z - (zz*r + U*uu + V*vv) );
     }
-    cv::Mat depth_params;
-    double rp_err1 = 0, rp_err2 = 0;
-    if (cv::solve(cv::Mat(ls_src10).reshape(1), cv::Mat(ls_src11), depth_params,
-                  DECOMP_LU | DECOMP_NORMAL)) {
-      dd = depth_params.at<double>(0);
-      U = depth_params.at<double>(1);
-      V = depth_params.at<double>(2);
-      std::cerr << "D = " << dd << ", U = " << U << ", V = " << V << std::endl;
-
-      for(unsigned int i = 0; i < ls_src2.size() ; i++){
-        double Z = ls_src1[i][1];
-        double r = ls_src2[i]/Z;
-        double r_buf = ls_src2_buf[i]/Z;
-        double u = ls_src3[i].x - camMatrix.at<double>(0,2);
-        double v = ls_src3[i].y - camMatrix.at<double>(1,2);
-        rp_err1 += fabs(Z + A / (r_buf - B));
-        rp_err2 += fabs(Z + b*f/((SHIFT_SCALE*(r-B))+U*u*u+V*v*v) );
-      }
-      rp_err1 /= ls_src2.size();
-      rp_err2 /= ls_src2.size();
-      printf("\nReprojection error will change from %f to %f by hyperboloid fitting\n\n", rp_err1, rp_err2);
-    }
+    rp_err /= ls_src2.size();
+    printf("\nZ fitting Reprojection error = %f\n\n", rp_err);
+    std::cerr << depth_params << std::endl;
+  }
+  else {
+    printf("**** Failed to solve least-squared problem ****\n");
+    return 1;
   }
 
   // 
@@ -632,7 +553,7 @@ main(int argc, char **argv)
   Q << 1, 0, 0,    -cptr[2],  // -cx
     0, 1, 0,    -cptr[5],  // -cy
     0, 0, 0,     cptr[0],  // focal length
-    0, 0, 1.0/b, 0;        // baseline
+    0, 0, 1.0/0.075, 0;        // baseline
 
   std::cerr << "from u,v,d of depth camera to XYZ : " << std::endl << Q << std::endl << std::endl;
 
@@ -659,8 +580,6 @@ main(int argc, char **argv)
   sprintf(params_fname, "%s/kinect_params.yaml", fdir);
   FILE *params_file = fopen(params_fname, "w");
   if (params_file) {
-    fprintf(params_file, "shift_offset: %.4f\n", B);
-    fprintf(params_file, "projector_depth_baseline: %.5f\n", b);
     dptr = R.ptr<double>(0);
     fprintf(params_file,
             "depth_rgb_rotation: [ %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f ]\n",
@@ -672,8 +591,8 @@ main(int argc, char **argv)
             "projector_coefficients:\n"
             "    u_coeff: %.8e\n"
             "    v_coeff: %.8e\n"
-            "    disp_coeff: %.8f\n",
-            U, V, dd);
+            "    z_coeff: %.8f\n",
+            U, V, zz);
     printf("Wrote additional calibration parameters to %s\n", params_fname);
   }
   
@@ -718,7 +637,6 @@ main(int argc, char **argv)
       // Rectify IR image
       cv::Mat imgIrRect;
       cv::undistort(imgIr, imgIrRect, camMatrix, distCoeffs);
-      //imgIrRect = imgIr;
 
       uint16_t *dptr = img.ptr<uint16_t>(0);
       uint16_t *drptr = imgRect.ptr<uint16_t>(0);
@@ -743,7 +661,8 @@ main(int argc, char **argv)
       for (int i=0; i<ROWS; i++)
         for (int j=0; j<COLS; j++,k++) // k is depth image index
           {
-            double d = shift2disp(drptr[k], B);
+            //double d = shift2disp(drptr[k], 1080);
+            double d=drptr[k];
             if (d <= 0)
               d = 0.0;          // not valid
             Vector4d p;
@@ -800,9 +719,7 @@ main(int argc, char **argv)
                camMatrix.at<double>(0,2), // cx
                camMatrix.at<double>(1,2), // cy
                camMatrix.at<double>(0,0), // focal length
-               camMatrix.at<double>(1,1), // focal length
-               b,      // baseline
-               B      // shift offset
+               camMatrix.at<double>(1,1) // focal length
                );
 
       sprintf(fname,"%s/depth_rect_%02d.pcd",fdir,fnum);
@@ -812,9 +729,7 @@ main(int argc, char **argv)
                camMatrix.at<double>(1,2), // cy
                camMatrix.at<double>(0,0), // focal length
                camMatrix.at<double>(1,1), // focal length
-               b,      // baseline
-               B,      // shift offset
-               dd, U, V // projector parameters
+               zz, U, V // projector parameters
                );
       fnum++;
     }
