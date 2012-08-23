@@ -11,6 +11,13 @@ kinect_near_mode_calibration ROS Launch Files
 
 **License:** BSD
 
+acquire_data.launch
+-------------------
+
+.. code-block:: bash
+
+  roslaunch kinect_near_mode_calibration acquire_data.launch
+
 kinect_near_mode_calibration.launch
 -----------------------------------
 
