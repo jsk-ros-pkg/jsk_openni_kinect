@@ -2,6 +2,7 @@
 #include <topic_tools/MuxAdd.h>
 #include <topic_tools/MuxDelete.h>
 #include <topic_tools/MuxSelect.h>
+#include <std_srvs/Empty.h>
 
 topic_tools::MuxAdd add_req;
 topic_tools::MuxDelete del_req;
@@ -55,7 +56,7 @@ void saveDepth(int cntr){
   ros::service::call("/depth/save_image",depth_req);
 }
 void saveIR(int cntr){
-  printf("saved IR image\n", str);
+  printf("saved IR image\n");
   ros::service::call("/ir/save_image",ir_req);
 }
 
