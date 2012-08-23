@@ -29,7 +29,7 @@ w  </node>
   <node name="ir_image_saver" pkg="image_view_jsk_patch" type="image_saver" ns="ir">
     <remap from="image" to="/camera/ir_rgb_ir/image_mono"/>
     <param name="filename_format" value="img_ir_%02i.png"/>
-    <param name="filename_encoding" value="mono8"/>
+    <param name="encoding" value="mono8"/>
     <param name="save_all_image" value="false"/>
   </node>
 
