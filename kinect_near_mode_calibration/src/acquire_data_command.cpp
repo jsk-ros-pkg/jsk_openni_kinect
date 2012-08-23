@@ -2,14 +2,13 @@
 #include <topic_tools/MuxAdd.h>
 #include <topic_tools/MuxDelete.h>
 #include <topic_tools/MuxSelect.h>
-#include "image_view_jsk_patch/SaveImage.h"
 
 topic_tools::MuxAdd add_req;
 topic_tools::MuxDelete del_req;
 topic_tools::MuxSelect sel_req;
-image_view_jsk_patch::SaveImage rgb_req;
-image_view_jsk_patch::SaveImage ir_req;
-image_view_jsk_patch::SaveImage depth_req;
+std_srvs::Empty rgb_req;
+std_srvs::Empty ir_req;
+std_srvs::Empty depth_req;
 std::string dir_name;
 
 void start_rgb(){
@@ -48,29 +47,16 @@ void start_ir(){
 }
 
 void saveRGB(int cntr){
-  char str[20];
-  sprintf(str, "img_rgb_%02i.png",cntr);
-  rgb_req.request.filename = str;
-  rgb_req.request.directory = dir_name;
-  printf("saved rgb image %s\n", str);
-  ros::service::call("/ir_rgb/save_image",rgb_req);
+  printf("saved rgb image\n");
+  ros::service::call("/rgb/save_image",rgb_req);
 }
 void saveDepth(int cntr){
-  char str[20];
-  sprintf(str, "img_depth_%02i.png",cntr);
-  depth_req.request.filename = str;
-  depth_req.request.directory = dir_name;
-  printf("saved depth image %s\n", str);
+  printf("saved depth image\n");
   ros::service::call("/depth/save_image",depth_req);
 }
 void saveIR(int cntr){
-  char str[20];
-  sprintf(str, "img_ir_%02i.png",cntr);
-  ir_req.request.filename = str;
-  ir_req.request.directory = dir_name;
-  ir_req.request.encoding="mono8";
-  printf("saved IR image %s\n", str);
-  ros::service::call("/ir_rgb/save_image",ir_req);
+  printf("saved IR image\n", str);
+  ros::service::call("/ir/save_image",ir_req);
 }
 
 int main(int argc, char** argv){
@@ -82,10 +68,6 @@ int main(int argc, char** argv){
 
   ros::init(argc, argv, "acquire data manager");
   
-  if(!ros::param::get("directory_name",dir_name)){
-    dir_name=".";
-  }
-
   while (ros::ok){
     char key;
     printf("input command : ");
