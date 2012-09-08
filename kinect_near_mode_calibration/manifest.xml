@@ -10,7 +10,6 @@
   <url>http://ros.org/wiki/kinect_near_mode_calibration</url>
 
   <depend package="opencv2"/>
-  <depend package="eigen"/>
   <depend package="std_srvs"/>
   <depend package="image_view_jsk_patch"/>
   <depend package="checkerboard_detector"/>
