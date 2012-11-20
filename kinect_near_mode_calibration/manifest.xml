@@ -15,6 +15,8 @@
   <depend package="checkerboard_detector"/>
   <depend package="openni_camera"/>
   <depend package="jsk_tools"/>
+  <depend package="std_srvs"/>
+  <depend package="image_geometry"/>
 
   <export>
     <rosdoc config="rosdoc.yaml"/>

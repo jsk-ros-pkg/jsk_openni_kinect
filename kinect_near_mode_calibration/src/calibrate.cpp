@@ -55,6 +55,9 @@
 #include <Eigen/Core>
 #include <Eigen/LU>
 
+#include <image_geometry/pinhole_camera_model.h>
+#include <sensor_msgs/distortion_models.h>
+
 using namespace cv;
 using namespace Eigen;
 using namespace std;
@@ -67,12 +70,21 @@ using namespace std;
 cv::Point2f ir_depth_offset = cv::Point2f(-4, -3);
 
 #define SHIFT_SCALE 0.125
+#define BASELINE 0.075
 
 // change shift to disparity
 double shift2disp(int shift, double shift_offset)
 {
   return SHIFT_SCALE*(double)(shift_offset - shift);
 }
+double depth2disp(double depth, double f){
+  return ( (depth < 1.0) ? 0 : ((BASELINE*f)/(depth/1000.0)) );
+}
+int depth2shift(double depth, double shift_offset, double f)
+{
+  return ( (int)(shift_offset - depth2disp(depth, f) / SHIFT_SCALE) );
+}
+
 
 // colorizes a depth pixel
 uint16_t t_gamma[2048];         // gamma conversion for depth
@@ -170,15 +182,19 @@ void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, fl
   for (int v = 0; v < depth.rows; v++) { // y
     for (int u = 0; u < depth.cols; u++) { // x
       double r = depth.at<uint16_t>(cv::Point2f(u,v));
-      if ( (r < 1) || (5000 < r) ) {
+      if ( (r < 0) || (2000 < r) ) {
         fprintf(f, "%f %f %f\n", 0.0f, 0.0f, 0.0f);
       } else {
         float uu = u - cx;
         float vv = v - cy;
-        float z = r*R + U*uu*uu + V*vv*vv;
-        float x = uu / fx * z;
-        float y = vv / fy * z;
-        fprintf(f, "%f %f %f\n", x, y, z);
+        float z = (r*R + U*uu*uu + V*vv*vv)/1000.0;
+        if (z < 0.0) {
+          fprintf(f, "%f %f %f\n", 0.0f, 0.0f, 0.0f);
+        } else {
+          float x = uu / fx * z;
+          float y = vv / fy * z;
+          fprintf(f, "%f %f %f\n", x, y, z);
+        }
       }
     }
   }
@@ -283,7 +299,7 @@ main(int argc, char **argv)
   vector<Point3f> pat;
   for (int i=0; i<ccols; i++)
     for (int j=0; j<crows; j++)
-      pat.push_back(Point3f(i*csize,j*csize,0));
+      pat.push_back(Point3f(j*csize,i*csize,0));
 
   // read in images, set up feature points and patterns
   vector<vector<Point3f> > pats;
@@ -299,7 +315,7 @@ main(int argc, char **argv)
       if (img.data == NULL) break; // no data, not read, break out
 
       vector<cv::Point2f> corners;
-      bool ret = cv::findChessboardCorners(img,Size(crows,ccols),corners);
+      bool ret = cv::findChessboardCorners(img,Size(crows,ccols),corners,CV_CALIB_CB_ADAPTIVE_THRESH);
 
       if (ret)
         printf("Found corners in image %s\n",fname);
@@ -356,6 +372,20 @@ main(int argc, char **argv)
          "k3: %f\n", dptr[0], dptr[1], dptr[2], dptr[3], dptr[4]);
   
   printf("\nReprojection error = %f\n\n", rp_err);
+  
+  //for findExtrinsicCameraParams
+  CvMat *intrinsic_matrix = cvCreateMat(3,3,CV_32FC1);
+  printf("intrinsic matrix\n");
+  for(int i = 0; i < 3; ++i){
+    for(int j = 0; j < 3; ++j){
+      intrinsic_matrix->data.fl[3*i+j] = camMatrix.at<double>(i,j);
+    }
+  }
+
+  CvMat *dist = cvCreateMat(1,4,CV_32FC1);
+  for(int i = 0; i < 4; ++i){
+    cvSetReal1D(dist,i,distCoeffs.at<double>(i));
+  }
 
   char depth_fname[1024];
   sprintf(depth_fname, "%s/calibration_depth.yaml", fdir);
@@ -364,12 +394,38 @@ main(int argc, char **argv)
     writeCalibration(depth_file, camMatrix, distCoeffs);
     printf("Wrote depth camera calibration to %s\n\n", depth_fname);
   }
-  
+  fclose(depth_file);
+
   // Read in depth images, fit readings to computed depths
   /// @todo Not checking that we actually got depth readings!
   fnum = 0;
   std::vector<cv::Vec3d> ls_src1;
   std::vector<double> ls_src2;
+  // for findExtrinsicCameraParams
+  CvMat *objpoints = cvCreateMat(3,(pats.front()).size(),CV_32FC1);
+  CvMat *rvec_buf = cvCreateMat(1, 3, CV_32FC1);
+  CvMat *tvec_buf = cvCreateMat(1, 3, CV_32FC1);
+  CvMat *img_points = cvCreateMat(2, (pats.front()).size(), CV_32FC1);
+
+  sensor_msgs::CameraInfo info;
+  image_geometry::PinholeCameraModel pcm;
+  info.width = COLS;
+  info.height = ROWS;
+  for(int i = 0; i < 3; ++i){
+    for(int j = 0; j < 3; ++j){
+      info.K[3*i+j] = camMatrix.at<double>(i,j);
+      info.P[4*i+j] = camMatrix.at<double>(i,j);
+    }
+    info.P[4*i+3] = 0.0;
+  }
+  info.D.resize(5);
+  for(int i = 0; i < 5; ++i){
+    info.D[i] = distCoeffs.at<double>(i);
+  }
+  info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
+      
+  pcm.fromCameraInfo(info);
+
   while (1)
     {
       // Load raw depth readings
@@ -378,13 +434,55 @@ main(int argc, char **argv)
       Mat img_depth = imread(fname,-1);
       if (img_depth.data == NULL) break; // no data, not read, break out
       Mat img_depth_rect;
-      undistort_nearest(img_depth, img_depth_rect, camMatrix, distCoeffs);
+      //undistort_nearest(img_depth, img_depth_rect, camMatrix, distCoeffs);
+      pcm.rectifyImage(img_depth, img_depth_rect, 0);
 
-      // Get corner points and extrinsic parameters
+      //
+      char fname_ir[1024];
+      sprintf(fname_ir,"%s/img_ir_%02d.png",fdir,fnum);
+      Mat img_ir = imread(fname_ir,-1);
+      if (img_ir.data == NULL) break; // no data, not read, break out
+      Mat img_ir_rect;
+      pcm.rectifyImage(img_ir, img_ir_rect, 1); // interpolation : Linear
+      
+      vector<cv::Point2f> corners;
+      bool ret = cv::findChessboardCorners(img_ir_rect,Size(crows,ccols),corners,CV_CALIB_CB_ADAPTIVE_THRESH);
+
+      if (ret)
+        printf("Found corners in image %s\n",fname_ir);
+      else {
+        printf("*** Didn't find corners in image %s\n",fname_ir);
+        return 1;
+      }
+
+      cv::cornerSubPix(img_ir_rect, corners, Size(9,9), Size(-1,-1),
+                       //TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
+                       TermCriteria(TermCriteria::MAX_ITER, 50, 1e-2));
       const cv::Mat pattern(pats[fnum]); // 3-channel matrix view of vector<Point3f>
-      vector<Point2f> &corners = points[fnum];
-      cv::Mat rvec = rvecs[fnum];
-      cv::Mat tvec = tvecs[fnum];
+      vector<Point3f>::iterator it_pat = pat.begin();
+      vector<cv::Point2f>::iterator it = corners.begin();
+      for(size_t i=0; i<pattern.size().height; ++i) {
+        cvSetReal2D(objpoints, 0,i, (*it_pat).x);
+        cvSetReal2D(objpoints, 1,i, (*it_pat).y);
+        cvSetReal2D(objpoints, 2,i, (*it_pat).z);
+        cvSetReal2D(img_points, 0, i, (*it).x );
+        cvSetReal2D(img_points, 1, i, (*it).y );
+        it_pat++;
+        it++;
+      }
+      for(size_t i=0; i<3; ++i){
+        cvSetReal1D(rvec_buf,i,0.0);
+        cvSetReal1D(tvec_buf,i,0.0);
+      }
+
+      cvFindExtrinsicCameraParams2(objpoints, img_points, intrinsic_matrix, dist, rvec_buf, tvec_buf);
+      cv::Mat rvec(3, 1, CV_64FC1);
+      cv::Mat tvec(3, 1, CV_64FC1);
+      for(size_t i=0; i<3; i++){
+        rvec.at<double>(i) = cvGetReal1D(rvec_buf, i);
+        tvec.at<double>(i) = cvGetReal1D(tvec_buf, i);
+      }
+
       cv::Mat rot3x3;
       cv::Rodrigues(rvec, rot3x3);
 
@@ -405,7 +503,9 @@ main(int argc, char **argv)
         double r = img_depth_rect.at<uint16_t>(corners[j]); // sensor reading
         double uu = corners[j].x - cx;
         double vv = corners[j].y - cy;
-        if ( (0 < r) && (r < 5000) ){
+        if ( (0 < r) && (r < 5000)
+             // && (uu*uu + vv*vv < 150*150)
+             ){
           ls_src1.push_back(cv::Vec3d(r, uu*uu, vv*vv));
           ls_src2.push_back(Z*1000.0);
         }
@@ -414,8 +514,16 @@ main(int argc, char **argv)
       fnum++;
     }
 
+  cvReleaseMat(&objpoints);
+  cvReleaseMat(&intrinsic_matrix);
+  cvReleaseMat(&dist);
+  cvReleaseMat(&rvec_buf);
+  cvReleaseMat(&tvec_buf);
+  cvReleaseMat(&img_points);
+
   cv::Mat depth_params;
   double zz, U, V;
+
   if (cv::solve(cv::Mat(ls_src1).reshape(1), cv::Mat(ls_src2), depth_params,
                 DECOMP_LU | DECOMP_NORMAL)) {
     zz = depth_params.at<double>(0);
@@ -430,7 +538,7 @@ main(int argc, char **argv)
       rp_err += abs( Z - (zz*r + U*uu + V*vv) );
     }
     rp_err /= ls_src2.size();
-    printf("\nZ fitting Reprojection error = %f\n\n", rp_err);
+    printf("\nZ fitting Reprojection error = %f\n\n", rp_err / 1000.0);
     std::cerr << depth_params << std::endl;
   }
   else {
@@ -521,6 +629,7 @@ main(int argc, char **argv)
     writeCalibration(rgb_file, camMatrixRGB, distCoeffsRGB);
     printf("Wrote RGB camera calibration to %s\n\n", rgb_fname);
   }
+  fclose(rgb_file);
 
   // stereo calibration between IR and RGB
   Mat R,T,E,F;
@@ -595,6 +704,7 @@ main(int argc, char **argv)
             U, V, zz);
     printf("Wrote additional calibration parameters to %s\n", params_fname);
   }
+  fclose(params_file);
   
   //
   // create rectified disparity images and save
@@ -661,8 +771,7 @@ main(int argc, char **argv)
       for (int i=0; i<ROWS; i++)
         for (int j=0; j<COLS; j++,k++) // k is depth image index
           {
-            //double d = shift2disp(drptr[k], 1080);
-            double d=drptr[k];
+            double d = depth2disp(drptr[k], camMatrix.at<double>(0,0));
             if (d <= 0)
               d = 0.0;          // not valid
             Vector4d p;
@@ -671,8 +780,8 @@ main(int argc, char **argv)
             q = D*p;
             int u = (int)(q[0]/q[2]+0.5);
             int v = (int)(q[1]/q[2]+0.5);
-            setDepthColor(&cptr[3*(i*COLS+j)],dptr[k]);
-            setDepthColor(&crptr[3*(i*COLS+j)],drptr[k]);
+            setDepthColor(&cptr[3*(i*COLS+j)],depth2shift(dptr[k], 1080, camMatrix.at<double>(0,0)));
+            setDepthColor(&crptr[3*(i*COLS+j)],depth2shift(drptr[k], 1080, camMatrix.at<double>(0,0)));
             if (u < 0 || v < 0 || u >= COLS || v >= ROWS)
               continue;
             int disp = (int)(d*16+0.499);
@@ -680,7 +789,7 @@ main(int argc, char **argv)
             if (rptr[kk] < disp) // z-buffer check
               {
                 rptr[kk] = disp;
-                setDepthColor(&rcptr[3*kk],drptr[k]);
+                setDepthColor(&rcptr[3*kk],depth2shift(drptr[k], 1080, camMatrix.at<double>(0,0)));
               }
             if (d != 0.0) {
               memcpy(&dcptr[3*k],&rgbptr[3*kk],3); // RGB mapped to depth image
