@@ -20,20 +20,21 @@
   <node name="ir_rgb_rgb_caminfo_relay" type="relay" pkg="topic_tools" ns="image"
 	args="/camera/ir_rgb/camera_info /camera/ir_rgb_rgb/camera_info" />
 
-  <node name="depth_image_saver" pkg="image_view_jsk_patch" type="image_saver" ns="depth">
+  <node name="depth_image_saver" pkg="image_view_jsk_patch" type="image_saver">
     <remap from="image" to="/camera/depth/image_raw"/>
     <param name="filename_format" value="img_depth_%02i.png"/>
+    <param name="encoding" value="mono16"/>
     <param name="save_all_image" value="false"/>
-w  </node>
+  </node>
 
-  <node name="ir_image_saver" pkg="image_view_jsk_patch" type="image_saver" ns="ir">
+  <node name="ir_image_saver" pkg="image_view_jsk_patch" type="image_saver">
     <remap from="image" to="/camera/ir_rgb_ir/image_mono"/>
     <param name="filename_format" value="img_ir_%02i.png"/>
     <param name="encoding" value="mono8"/>
     <param name="save_all_image" value="false"/>
   </node>
 
-  <node name="rgb_image_saver" pkg="image_view_jsk_patch" type="image_saver" ns="rgb">
+  <node name="rgb_image_saver" pkg="image_view_jsk_patch" type="image_saver">
     <remap from="image" to="/camera/ir_rgb_rgb/image_mono"/>
     <param name="filename_format" value="img_rgb_%02i.png"/>
     <param name="save_all_image" value="false"/>

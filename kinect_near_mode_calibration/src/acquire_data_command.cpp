@@ -48,16 +48,25 @@ void start_ir(){
 }
 
 void saveRGB(int cntr){
-  printf("saved rgb image\n");
-  ros::service::call("/rgb/save_image",rgb_req);
+  char str[300];
+  sprintf(str, "%s/img_rgb_%02i.png",dir_name.c_str(), cntr);
+  ros::param::set("/rgb_image_saver/filename_format", str);
+  ros::service::call("/rgb_image_saver/save",rgb_req);
+  ROS_INFO("saved rgb image in %s", str);
 }
 void saveDepth(int cntr){
-  printf("saved depth image\n");
-  ros::service::call("/depth/save_image",depth_req);
+  char str[300];
+  sprintf(str, "%s/img_depth_%02i.png",dir_name.c_str(), cntr);
+  ros::param::set("/depth_image_saver/filename_format", str);
+  ros::service::call("/depth_image_saver/save",depth_req);
+  ROS_INFO("saved depth image in %s", str);
 }
 void saveIR(int cntr){
-  printf("saved IR image\n");
-  ros::service::call("/ir/save_image",ir_req);
+  char str[300];
+  sprintf(str, "%s/img_ir_%02i.png",dir_name.c_str(), cntr);
+  ros::param::set("/ir_image_saver/filename_format", str);
+  ros::service::call("/ir_image_saver/save",ir_req);
+  ROS_INFO("saved ir image in %s", str);
 }
 
 int main(int argc, char** argv){
@@ -70,6 +79,8 @@ int main(int argc, char** argv){
   ros::init(argc, argv, "acquire data manager");
   
   while (ros::ok){
+    ros::param::get("/directory_name", dir_name);
+
     char key;
     printf("input command : ");
     fgets(buf, sizeof(buf), stdin);
