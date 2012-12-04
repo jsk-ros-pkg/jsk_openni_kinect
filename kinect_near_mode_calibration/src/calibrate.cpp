@@ -182,7 +182,7 @@ void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, fl
   for (int v = 0; v < depth.rows; v++) { // y
     for (int u = 0; u < depth.cols; u++) { // x
       double r = depth.at<uint16_t>(cv::Point2f(u,v));
-      if ( (r < 0) || (2000 < r) ) {
+      if ( (r < 0) || (5000 < r) ) {
         fprintf(f, "%f %f %f\n", 0.0f, 0.0f, 0.0f);
       } else {
         float uu = u - cx;
@@ -329,7 +329,10 @@ main(int argc, char **argv)
         
         cv::cornerSubPix(img_ir, corners_ir, Size(5,5), Size(-1,-1),
                          TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
-        cv::cornerSubPix(img_rgb, corners_rgb, Size(5,5), Size(-1,-1),
+        Mat gray;
+        cv::cvtColor(img_rgb, gray, CV_RGB2GRAY);
+
+        cv::cornerSubPix(gray, corners_rgb, Size(5,5), Size(-1,-1),
                          TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
 
         pats.push_back(pat);
@@ -568,7 +571,8 @@ main(int argc, char **argv)
         for (unsigned int i = 0; i < corners.size(); ++i)
           corners[i] += ir_depth_offset;
 
-        const cv::Mat pattern(pats[fnum]); // 3-channel matrix view of vector<Point3f>
+        //const cv::Mat pattern(pats[fnum]); // 3-channel matrix view of vector<Point3f>
+        const cv::Mat pattern(pat); // 3-channel matrix view of vector<Point3f>
         vector<Point3f>::iterator it_pat = pat.begin();
         vector<cv::Point2f>::iterator it = corners.begin();
         for(size_t i=0; i<pattern.size().height; ++i) {
