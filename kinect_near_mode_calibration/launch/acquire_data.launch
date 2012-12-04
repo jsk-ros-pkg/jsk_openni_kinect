@@ -2,8 +2,6 @@
   <arg name="dir_name"/>
   <arg name="grid_x" default="8"/>
   <arg name="grid_y" default="6"/>
-
-  <include file="$(find openni_launch)/launch/openni.launch"/>
   
   <node name="ir_rgb_image_switcher" type="mux" pkg="topic_tools" ns="image"
         args="/camera/ir_rgb/image_mono /camera/rgb/image_mono"/>
