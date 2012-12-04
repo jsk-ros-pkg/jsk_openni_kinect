@@ -67,7 +67,7 @@ using namespace std;
 #define COLS 640
 
 // Pixel offset from IR image to depth image
-cv::Point2f ir_depth_offset = cv::Point2f(-4, -3);
+cv::Point2f ir_depth_offset = cv::Point2f(-5, -4);
 
 #define SHIFT_SCALE 0.125
 #define BASELINE 0.075
@@ -297,8 +297,8 @@ main(int argc, char **argv)
 
   // construct the planar pattern
   vector<Point3f> pat;
-  for (int i=0; i<ccols; i++)
-    for (int j=0; j<crows; j++)
+  for (int i=0; i<crows; i++)
+    for (int j=0; j<ccols; j++)
       pat.push_back(Point3f(j*csize,i*csize,0));
 
   // read in images, set up feature points and patterns
@@ -320,25 +320,17 @@ main(int argc, char **argv)
       if (img_rgb.data == NULL) break; // no data, not read, break out
 
       vector<cv::Point2f> corners_ir;
-      bool ret_ir = cv::findChessboardCorners(img_ir,Size(crows,ccols),corners_ir,CV_CALIB_CB_ADAPTIVE_THRESH);
+      bool ret_ir = cv::findChessboardCorners(img_ir,Size(ccols,crows),corners_ir,CV_CALIB_CB_ADAPTIVE_THRESH);
       vector<cv::Point2f> corners_rgb;
-      bool ret_rgb = cv::findChessboardCorners(img_rgb,Size(crows,ccols),corners_rgb,CV_CALIB_CB_ADAPTIVE_THRESH);
+      bool ret_rgb = cv::findChessboardCorners(img_rgb,Size(ccols,crows),corners_rgb,CV_CALIB_CB_ADAPTIVE_THRESH);
 
       if (ret_ir && ret_rgb){
         printf("Found corners in ir image %s and rgb image %s\n", ir_fname, rgb_fname);
         
         cv::cornerSubPix(img_ir, corners_ir, Size(5,5), Size(-1,-1),
                          TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
-        // Mat gray;
-        // cv::cvtColor(img_rgb, gray, CV_RGB2GRAY);
-        // cv::cornerSubPix(gray, corners_rgb, Size(5,5), Size(-1,-1),
-        //                  TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
         cv::cornerSubPix(img_rgb, corners_rgb, Size(5,5), Size(-1,-1),
                          TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
-
-        // Adjust corners detected in IR image to where they would appear in the depth image
-        for (unsigned int i = 0; i < corners_ir.size(); ++i)
-          corners_ir[i] += ir_depth_offset;
 
         pats.push_back(pat);
         points.push_back(corners_ir);
@@ -440,7 +432,7 @@ main(int argc, char **argv)
   // stereo calibration between IR and RGB
   Mat R,T,E,F;
   rp_err = stereoCalibrate(pats,points,pointsRGB,camMatrix,distCoeffs,
-                           camMatrixRGB,distCoeffsRGB,Size(crows,ccols),
+                           camMatrixRGB,distCoeffsRGB,Size(ccols,crows),
                            R,T,E,F);
   
   dptr = T.ptr<double>(0);
@@ -564,15 +556,19 @@ main(int argc, char **argv)
       pcm.rectifyImage(img_ir, img_ir_rect, 1); // interpolation : Linear
       
       vector<cv::Point2f> corners;
-      bool ret = cv::findChessboardCorners(img_ir_rect,Size(crows,ccols),corners,CV_CALIB_CB_ADAPTIVE_THRESH);
+      bool ret = cv::findChessboardCorners(img_ir_rect,Size(ccols,crows),corners,CV_CALIB_CB_ADAPTIVE_THRESH);
 
       if (ret){
         printf("Found corners in image %s\n",fname_ir);
         cv::cornerSubPix(img_ir_rect, corners, Size(9,9), Size(-1,-1),
                          //TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
                          TermCriteria(TermCriteria::MAX_ITER, 50, 1e-2));
-        //const cv::Mat pattern(pats[fnum]); // 3-channel matrix view of vector<Point3f>
-        const cv::Mat pattern(pat); // 3-channel matrix view of vector<Point3f>
+
+        // Adjust corners detected in IR image to where they would appear in the depth image
+        for (unsigned int i = 0; i < corners.size(); ++i)
+          corners[i] += ir_depth_offset;
+
+        const cv::Mat pattern(pats[fnum]); // 3-channel matrix view of vector<Point3f>
         vector<Point3f>::iterator it_pat = pat.begin();
         vector<cv::Point2f>::iterator it = corners.begin();
         for(size_t i=0; i<pattern.size().height; ++i) {
@@ -626,8 +622,8 @@ main(int argc, char **argv)
           double r = img_depth_rect.at<uint16_t>(corners[j]); // sensor reading
           double uu = corners[j].x - cx;
           double vv = corners[j].y - cy;
-          if ( (0 < r) && (r < 5000)
-               // && (uu*uu + vv*vv < 150*150)
+          if ( (0 < r) && (r < 2000)
+               && (uu*uu + vv*vv < 150*150)
                ){
             ls_src1.push_back(cv::Vec3d(r, uu*uu, vv*vv));
             ls_src2.push_back(Z*1000.0);
@@ -717,7 +713,8 @@ main(int argc, char **argv)
 
       // Rectify Depth image
       cv::Mat imgRect;
-      undistort_nearest(img, imgRect, camMatrix, distCoeffs);
+      //undistort_nearest(img, imgRect, camMatrix, distCoeffs);
+      pcm.rectifyImage(img, imgRect, 0);
 
       sprintf(fname,"%s/img_rgb_%02d.png",fdir,fnum);
       Mat imgRGB = imread(fname,1);
