@@ -17,6 +17,7 @@
   <depend package="jsk_tools"/>
   <depend package="std_srvs"/>
   <depend package="image_geometry"/>
+  <depend package="depth_image_proc_jsk_patch"/>
 
   <export>
     <rosdoc config="rosdoc.yaml"/>
