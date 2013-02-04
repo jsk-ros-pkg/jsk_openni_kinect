@@ -62,10 +62,10 @@ prepare hardware
 
 - set cover to IR projector. It should be change cover state with not moving kinect.
 
-  .. |zoom_uncover| image:: ../launch/img/zoom-uncovered.jpg
+  .. |zoom_uncover| image:: launch/img/zoom-uncovered.jpg
      :width: 400
 
-  .. |zoom_cover| image:: ../launch/img/zoom-covered.jpg
+  .. |zoom_cover| image:: launch/img/zoom-covered.jpg
      :width: 400
 
   +----------------------+--------------------+
@@ -89,13 +89,13 @@ modes
 
   Switch off IR light and uncover projector.
 
-  .. |rgb_env| image:: ../launch/img/rgb-depth-mode_eng_text.jpg
+  .. |rgb_env| image:: launch/img/rgb-depth-mode_eng_text.jpg
      :width: 300
 
-  .. |rgb_image| image:: ../launch/img/img_rgb.png
+  .. |rgb_image| image:: launch/img/img_rgb.png
      :width: 300
 
-  .. |rgb_depth_image| image:: ../launch/img/img_depth_rgb.png
+  .. |rgb_depth_image| image:: launch/img/img_depth_rgb.png
      :width: 300
 
   +------------------------------------+-------------+-------------------+
@@ -108,13 +108,13 @@ modes
 
   Switch on IR light and cover projector. Depth image should be black since the IR projector is covered.
 
-  .. |ir_env| image:: ../launch/img/ir-mode_eng_text.jpg
+  .. |ir_env| image:: launch/img/ir-mode_eng_text.jpg
      :width: 300
 
-  .. |ir_image| image:: ../launch/img/img_ir.png
+  .. |ir_image| image:: launch/img/img_ir.png
      :width: 300
 
-  .. |ir_depth_image| image:: ../launch/img/img_depth_ir.png
+  .. |ir_depth_image| image:: launch/img/img_depth_ir.png
      :width: 300
 
   +-----------------------------+------------+--------------------+
@@ -209,10 +209,10 @@ If you calibrate zoomed kinect with setting output directry to MY_DATA_DIR, plea
 results
 -------
 
-.. |before_calib| image:: ../launch/img/pointcloud_c_11.png
+.. |before_calib| image:: launch/img/pointcloud_c_11.png
    :width: 400
 
-.. |after_calib| image:: ../launch/img/pointcloud_c_rect_11.png
+.. |after_calib| image:: launch/img/pointcloud_c_rect_11.png
    :width: 400
 
 +-------------------------------+------------------------------+
@@ -221,12 +221,12 @@ results
 |         |before_calib|        |        |after_calib|         |
 +-------------------------------+------------------------------+
 
-.. figure:: ../launch/img/hrp2018_look_opencv_book.jpg
+.. figure:: launch/img/hrp2018_look_opencv_book.jpg
    :width: 400
 
    HRP-2 robot looks OpenCV book. The distance between Kinect and book is about 350mm.
 
-.. figure:: ../launch/img/opencv_book.jpg
+.. figure:: launch/img/opencv_book.jpg
    :width: 400
 
    left : pointcloud of the book acquired with non-calibrated Kinect. right : pointcloud acquired with calibrated Kinect. You can find out that the distortion is improved.
