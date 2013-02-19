@@ -66,6 +66,8 @@ using namespace std;
 #define ROWS 480
 #define COLS 640
 
+#define FOCAL_LENGTH 570.342224121
+
 // Pixel offset from IR image to depth image
 cv::Point2f ir_depth_offset = cv::Point2f(-5, -4);
 
@@ -165,7 +167,7 @@ void writeCalibration(FILE *f, const cv::Mat& cameraMatrix, const cv::Mat& distC
           K[0], K[1], K[2], K[3], K[4], K[5], K[6], K[7], K[8]);
 }
 
-void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, float R = 1, float U = 0, float V = 0) {
+void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, float offset = 0, float R = 1, float U = 0, float V = 0) {
   FILE *f = fopen(fname, "w");
   fprintf(f, "# .PCD v.7 - Point Cloud Data file format\n");
   fprintf(f, "VERSION .7\n");
@@ -187,7 +189,8 @@ void pcdwrite(char *fname, Mat depth, float cx, float cy, float fx, float fy, fl
       } else {
         float uu = u - cx;
         float vv = v - cy;
-        float z = (r*R + U*uu*uu + V*vv*vv)/1000.0;
+        double d = BASELINE * FOCAL_LENGTH / (r/1000.0);
+        float z =  BASELINE * FOCAL_LENGTH / (offset + d*R + U*uu*uu + V*vv*vv);;
         if (z < 0.0) {
           fprintf(f, "%f %f %f\n", 0.0f, 0.0f, 0.0f);
         } else {
@@ -329,11 +332,17 @@ main(int argc, char **argv)
         
         cv::cornerSubPix(img_ir, corners_ir, Size(5,5), Size(-1,-1),
                          TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
-        Mat gray;
-        cv::cvtColor(img_rgb, gray, CV_RGB2GRAY);
 
-        cv::cornerSubPix(gray, corners_rgb, Size(5,5), Size(-1,-1),
-                         TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
+        if(img_rgb.channels() == 3){
+          Mat gray;
+          cv::cvtColor(img_rgb, gray, CV_RGB2GRAY);
+          
+          cv::cornerSubPix(gray, corners_rgb, Size(5,5), Size(-1,-1),
+                           TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
+        }else{
+          cv::cornerSubPix(img_rgb, corners_rgb, Size(5,5), Size(-1,-1),
+                           TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 30, 0.1));
+        }
 
         pats.push_back(pat);
         points.push_back(corners_ir);
@@ -353,10 +362,10 @@ main(int argc, char **argv)
   double rp_err;
   rp_err = calibrateCamera(pats, points, Size(COLS,ROWS), camMatrix, distCoeffs,
                            rvecs, tvecs,
-                           CV_CALIB_FIX_K3 | 
+                           CV_CALIB_FIX_K3 //| 
                            //CV_CALIB_FIX_K2 | 
                            //CV_CALIB_FIX_K1 | 
-                           CV_CALIB_ZERO_TANGENT_DIST //|
+                           //CV_CALIB_ZERO_TANGENT_DIST //|
                            //CV_CALIB_FIX_PRINCIPAL_POINT |
                            //CV_CALIB_FIX_ASPECT_RATIO
                            );
@@ -394,10 +403,10 @@ main(int argc, char **argv)
                            rvecs_rgb, tvecs_rgb,
                            //CV_CALIB_FIX_K1 |
                            //CV_CALIB_FIX_K2 |
-                           CV_CALIB_FIX_K3 |
-                           CV_CALIB_ZERO_TANGENT_DIST |
+                           CV_CALIB_FIX_K3 //|
+                           //CV_CALIB_ZERO_TANGENT_DIST |
                            //CV_CALIB_FIX_PRINCIPAL_POINT |
-                           CV_CALIB_FIX_ASPECT_RATIO
+                           //CV_CALIB_FIX_ASPECT_RATIO
                            );
 
   // distortion results
@@ -488,7 +497,6 @@ main(int argc, char **argv)
   
   //for findExtrinsicCameraParams
   CvMat *intrinsic_matrix = cvCreateMat(3,3,CV_32FC1);
-  printf("intrinsic matrix\n");
   for(int i = 0; i < 3; ++i){
     for(int j = 0; j < 3; ++j){
       intrinsic_matrix->data.fl[3*i+j] = camMatrix.at<double>(i,j);
@@ -512,7 +520,8 @@ main(int argc, char **argv)
   // Read in depth images, fit readings to computed depths
   /// @todo Not checking that we actually got depth readings!
   fnum = 0;
-  std::vector<cv::Vec3d> ls_src1;
+  //std::vector<cv::Vec3d> ls_src1;
+  std::vector<cv::Vec4d> ls_src1;
   std::vector<double> ls_src2;
   // for findExtrinsicCameraParams
   CvMat *objpoints = cvCreateMat(3,(pats.front()).size(),CV_32FC1);
@@ -571,7 +580,6 @@ main(int argc, char **argv)
         for (unsigned int i = 0; i < corners.size(); ++i)
           corners[i] += ir_depth_offset;
 
-        //const cv::Mat pattern(pats[fnum]); // 3-channel matrix view of vector<Point3f>
         const cv::Mat pattern(pat); // 3-channel matrix view of vector<Point3f>
         vector<Point3f>::iterator it_pat = pat.begin();
         vector<cv::Point2f>::iterator it = corners.begin();
@@ -618,19 +626,21 @@ main(int argc, char **argv)
         printf("Writing %s\n", fname_chess_pcd);
         pcdwrite_chessboard(fname_chess_pcd, patterns);
           
-        double cx = camMatrix.at<double>(0,2);
-        double cy = camMatrix.at<double>(1,2);
-          
+        double cx = camMatrix.at<double>(0,2) + ir_depth_offset.x;
+        double cy = camMatrix.at<double>(1,2) + ir_depth_offset.y;
+        
         for (unsigned int j = 0; j < corners.size(); ++j) {
           double Z = world_points.at<cv::Vec3f>(j)[2];   // actual depth
-          double r = img_depth_rect.at<uint16_t>(corners[j]); // sensor reading
+          double d_chess = (BASELINE * FOCAL_LENGTH) / Z;
+          double r = img_depth_rect.at<uint16_t>(corners[j]) * 0.001; // sensor reading
+          double d_raw = (BASELINE * FOCAL_LENGTH) / r;
           double uu = corners[j].x - cx;
           double vv = corners[j].y - cy;
-          if ( (0 < r) && (r < 2000)
+          if ( (0 < r) && (Z < 1.000)
                && (uu*uu + vv*vv < 150*150)
                ){
-            ls_src1.push_back(cv::Vec3d(r, uu*uu, vv*vv));
-            ls_src2.push_back(Z*1000.0);
+            ls_src1.push_back(cv::Vec4d(1, d_raw, uu*uu, vv*vv));
+            ls_src2.push_back(d_chess);
           }
         }
       }
@@ -648,23 +658,25 @@ main(int argc, char **argv)
   cvReleaseMat(&img_points);
 
   cv::Mat depth_params;
-  double zz, U, V;
+  double offset, zz, U, V;
 
   if (cv::solve(cv::Mat(ls_src1).reshape(1), cv::Mat(ls_src2), depth_params,
                 DECOMP_LU | DECOMP_NORMAL)) {
-    zz = depth_params.at<double>(0);
-    U = depth_params.at<double>(1);
-    V = depth_params.at<double>(2);
+    offset = depth_params.at<double>(0);
+    zz = depth_params.at<double>(1);
+    U = depth_params.at<double>(2);
+    V = depth_params.at<double>(3);
     double rp_err = 0;
     for(unsigned int i = 0; i < ls_src2.size() ; i++){
-      double Z = ls_src2[i];
-      double r = ls_src1[i][0];
-      double uu = ls_src1[i][1];
-      double vv = ls_src1[i][2];
-      rp_err += abs( Z - (zz*r + U*uu + V*vv) );
+      double Z = (BASELINE * FOCAL_LENGTH) / ls_src2[i];
+      double d_raw = ls_src1[i][1];
+      double uu = ls_src1[i][2];
+      double vv = ls_src1[i][3];
+      double r = (BASELINE * FOCAL_LENGTH) / (offset + zz*d_raw + U*uu + V*vv);
+      rp_err += abs( Z - r );
     }
     rp_err /= ls_src2.size();
-    printf("\nZ fitting Reprojection error = %f\n\n", rp_err / 1000.0);
+    printf("\nZ fitting Reprojection error = %f\n\n", rp_err);
     std::cerr << depth_params << std::endl;
   }
   else {
@@ -687,8 +699,9 @@ main(int argc, char **argv)
             "projector_coefficients:\n"
             "    u_coeff: %.8e\n"
             "    v_coeff: %.8e\n"
-            "    z_coeff: %.8f\n",
-            U, V, zz);
+            "    d_coeff: %.8f\n"
+            "    offset: %.8e\n",
+            U, V, zz, offset);
     printf("Wrote additional calibration parameters to %s\n", params_fname);
   }
   fclose(params_file);
@@ -813,8 +826,17 @@ main(int argc, char **argv)
       sprintf(fname,"%s/depth_%02d.pcd",fdir,fnum);
       printf("Writing %s\n", fname);
       pcdwrite(fname,img,
-               camMatrix.at<double>(0,2), // cx
-               camMatrix.at<double>(1,2), // cy
+               camMatrix.at<double>(0,2) + ir_depth_offset.x, // cx
+               camMatrix.at<double>(1,2) + ir_depth_offset.y, // cy
+               camMatrix.at<double>(0,0), // focal length
+               camMatrix.at<double>(1,1) // focal length
+               );
+
+      sprintf(fname,"%s/depth_only_rectification_%02d.pcd",fdir,fnum);
+      printf("Writing %s\n", fname);
+      pcdwrite(fname,imgRect,
+               camMatrix.at<double>(0,2) + ir_depth_offset.x, // cx
+               camMatrix.at<double>(1,2) + ir_depth_offset.y, // cy
                camMatrix.at<double>(0,0), // focal length
                camMatrix.at<double>(1,1) // focal length
                );
@@ -822,11 +844,11 @@ main(int argc, char **argv)
       sprintf(fname,"%s/depth_rect_%02d.pcd",fdir,fnum);
       printf("Writing %s\n", fname);
       pcdwrite(fname,imgRect,
-               camMatrix.at<double>(0,2), // cx
-               camMatrix.at<double>(1,2), // cy
+               camMatrix.at<double>(0,2) + ir_depth_offset.x, // cx
+               camMatrix.at<double>(1,2) + ir_depth_offset.y, // cy
                camMatrix.at<double>(0,0), // focal length
                camMatrix.at<double>(1,1), // focal length
-               zz, U, V // projector parameters
+               offset, zz, U, V // projector parameters
                );
       fnum++;
     }
