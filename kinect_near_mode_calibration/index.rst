@@ -168,9 +168,9 @@ We have to compute these parameters.
 
 - hyperboloid fitting parameters
 
-Compute Z, U and V of fitting coefficients below (please refer http://www.ros.org/wiki/kinect_calibration/technical). The value (u, v) are pixels, z is depth value got from openni_driver, (cx, cy) is image center, z' is fitted depth value.
+Compute D, offset, U and V of fitting coefficients below (please refer http://www.ros.org/wiki/kinect_calibration/technical). The value (u, v) are pixels, z is depth value got from openni_driver, (cx, cy) is image center, d' is fitted disparity value.
 
-z' = Z*z + U*(u-cx)^2 + V*(v-cy)^2
+d' = offset + D*d + U*(u-cx)^2 + V*(v-cy)^2
 
 .. code-block:: bash
 
@@ -191,13 +191,15 @@ We attached the data we calibrate in our lab. You can try this package instantly
 
 .. code-block:: bash
 
-   roslaunch depth_image_proc_jsk_patch sample_zoom.launch
+   svn co https://jsk-ros-pkg.svn.sourceforge.net/svnroot/jsk-ros-pkg/trunk/jsk_ros_patch
+   rosmake openni_launch_jsk_patch
+   roslaunch openni_launch_jsk_patch sample_zoom.launch
 
 If you calibrate zoomed kinect with setting output directry to MY_DATA_DIR, please create a launch file like below.
 
 .. code-block:: bash
 
-   cat sample.launch
+   cat sample_zoom.launch
    <launch>
      <include file="$(find depth_image_proc_jsk_patch)/launch/openni.launch">
        <arg name="depth_camera_info_url" value="file://(path-to-data_dir)/calibration_depth.yaml"/>
