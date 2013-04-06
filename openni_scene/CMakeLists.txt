@@ -1,7 +1,4 @@
-find_package(catkin REQUIRED)
-STRING(REGEX REPLACE "^([0-9]+)\\.[0-9]+\\.[0-9]+" "\\1" catkin_MAJOR_VERSION ${catkin_VERSION})
-STRING(REGEX REPLACE "^[0-9]+\\.([0-9])+\\.[0-9]+" "\\1" catkin_MINOR_VERSION ${catkin_VERSION})
-if((NOT ${catkin_MAJOR_VERSION} LESS 0) AND (NOT ${catkin_MINOR_VERSION} LESS 5))
+if(NOT $ENV{ROS_DISTRO} STREQUAL "fuerte")
   include(catkin.cmake)
   return()
 endif()
