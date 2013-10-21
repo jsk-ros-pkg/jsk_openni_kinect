@@ -64,7 +64,8 @@ int main (int argc, char **argv)
 
   // Initialize OpenNI
   string configFilename = ros::package::getPath ("openni_scene") + "/openni_scene.xml";
-  XnStatus nRetVal = g_Context.InitFromXmlFile (configFilename.c_str ());
+  xn::ScriptNode scriptNode;
+  XnStatus nRetVal = g_Context.InitFromXmlFile (configFilename.c_str (), scriptNode);
   CHECK_RC (nRetVal, "InitFromXml");
 
   nRetVal = g_Context.FindExistingNode (XN_NODE_TYPE_SCENE, g_SceneAnalyzer);
@@ -134,6 +135,6 @@ int main (int argc, char **argv)
 
     }
   }
-  g_Context.Shutdown ();
+  g_Context.Release ();
   return 0;
 }
