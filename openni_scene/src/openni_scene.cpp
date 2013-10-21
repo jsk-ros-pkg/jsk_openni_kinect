@@ -10,7 +10,13 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
+#if ROS_VERSION <= ROS_VERSION_COMBINED(1,9,49)  // if this is groovy
 #include <pcl/PointIndices.h>
+#define POINT_INDICES_TYPE pcl::PointIndices
+#else
+#include <pcl_msgs/PointIndices.h>
+#define POINT_INDICES_TYPE pcl_msgs::PointIndices
+#endif
 
 using std::string;
 xn::Context g_Context;
@@ -96,9 +102,9 @@ int main (int argc, char **argv)
         continue;
       }
 
-      pcl::PointIndices msg;
+      POINT_INDICES_TYPE msg;
       msg.header.frame_id = "openni_depth_frame";
-      msg.header.stamp = time;
+      //msg.header.stamp = time;
       msg.indices = nIndices[i];
       std::string topic = "indices" + string(1, '0' + i);
 
@@ -111,7 +117,7 @@ int main (int argc, char **argv)
         if ( pub_index[i] == NULL ) {
           if ( nIndices[i].size() > 0 ) { // advertise
             ROS_INFO_STREAM( " 1 " << i << " " << pub_index.size());
-            pub_index[i] = nh.advertise<pcl::PointIndices>(topic, 10);
+            pub_index[i] = nh.advertise<POINT_INDICES_TYPE>(topic, 10);
             pub_index[i].publish(msg);
           } else { // do nothing
           }
@@ -124,7 +130,7 @@ int main (int argc, char **argv)
           }
         }
       } else { // i >_ pub_index.size() )
-        pub_index.push_back( nh.advertise<pcl::PointIndices>(topic, 10) );
+        pub_index.push_back( nh.advertise<POINT_INDICES_TYPE>(topic, 10) );
         if ( nIndices[i].size() > 0 ) { // advertise
           ROS_INFO_STREAM( " 2 " << i << " " << pub_index.size());
           pub_index[i].publish(msg);
