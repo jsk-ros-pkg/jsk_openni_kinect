@@ -18,12 +18,14 @@
   <build_depend>roscpp</build_depend>
   <build_depend>roslib</build_depend>
   <build_depend>geometry_msgs</build_depend>
+  <build_depend>pcl_msgs</build_depend>
   <build_depend>tf</build_depend>
   <build_depend>libopenni-nite-dev</build_depend>
 
   <run_depend>roscpp</run_depend>
   <run_depend>roslib</run_depend>
   <run_depend>geometry_msgs</run_depend>
+  <run_depend>pcl_msgs</run_depend>
   <run_depend>tf</run_depend>
   <run_depend>libopenni-nite-dev</run_depend>
 
