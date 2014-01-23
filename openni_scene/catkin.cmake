@@ -30,6 +30,9 @@ include_directories(
   ${PC_NITE_DEV_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS})
 add_definitions(${PC_LIBOPENNI_CFLAGS_OTHER})
+if($ENV{ROS_DISTRO} STREQUAL "groovy")
+  add_definitions(-DUSE_PCL_AS_PCL_MSGS)
+endif()
 add_executable(openni_scene src/openni_scene.cpp)
 target_link_libraries(openni_scene ${catkin_LIBRARIES} ${PC_NITE_DEV_LIBRARIES})
 add_dependencies(openni_scene pcl_msgs_gencpp)

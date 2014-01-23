@@ -10,7 +10,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
-#if ROS_VERSION <= ROS_VERSION_COMBINED(1,9,49)  // if this is groovy
+#if USE_PCL_AS_PCL_MSGS
 #include <pcl/PointIndices.h>
 #define POINT_INDICES_TYPE pcl::PointIndices
 #else
