@@ -9,6 +9,7 @@
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/kinect_near_mode_calibration</url>
 
+  <depend package="eigen"/>
   <depend package="opencv2"/>
   <depend package="std_srvs"/>
   <depend package="image_view_jsk_patch"/>
@@ -18,6 +19,13 @@
   <depend package="std_srvs"/>
   <depend package="image_geometry"/>
   <depend package="depth_image_proc_jsk_patch"/>
+
+  <rosdep name="eigen"/>
+  <rosdep name="opencv2"/>
+  <rosdep name="std_srvs"/>
+  <rosdep name="openni_camera"/>
+  <rosdep name="std_srvs"/>
+  <rosdep name="image_geometry"/>
 
   <export>
     <rosdoc config="rosdoc.yaml"/>
