@@ -13,6 +13,9 @@ pkg_check_modules(PC_LIBOPENNI REQUIRED libopenni)
 include_directories(
   ${PC_LIBOPENNI_INCLUDE_DIRS}
   ${PC_NITE_DEV_INCLUDE_DIRS})
+if($ENV{ROS_DISTRO} STREQUAL "groovy")
+  add_definitions(-DUSE_PCL_AS_PCL_MSGS)
+endif()
 
 
 rosbuild_find_ros_package(openni_camera)
