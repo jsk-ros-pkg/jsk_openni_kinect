@@ -4,10 +4,10 @@
 #include <std_msgs/UInt8.h>
 #include <tf/transform_broadcaster.h>
 
-#include <XnOpenNI.h>
-#include <XnCppWrapper.h>
-#include <XnHash.h>
-#include <XnLog.h>
+#include <ni/XnOpenNI.h>
+#include <ni/XnCppWrapper.h>
+#include <ni/XnHash.h>
+#include <ni/XnLog.h>
 
 // Header for NITE
 #include <XnVNite.h>
