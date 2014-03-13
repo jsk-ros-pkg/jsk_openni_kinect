@@ -20,5 +20,5 @@ openni_scene broadcasts the OpenNI scene segmented point clouds.
   <rosdep name="sensor_msgs"/>
   <rosdep name="pcl_ros"/>
   <rosdep name="libopenni-nite-dev"/>
-
+  <rosdep name="libopenni-dev" />
 </package>
