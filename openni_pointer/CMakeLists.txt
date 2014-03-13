@@ -19,4 +19,5 @@ endif()
 rosbuild_add_executable(openni_pointer src/openni_pointer.cpp)
 
 # https://code.ros.org/trac/ros-pkg/ticket/5287
-target_link_libraries(openni_pointer XnVNite)
+set(PC_NITE_DEV_LIBRARIES XnVNite_1_3_1;OpenNI)
+target_link_libraries(openni_pointer ${PC_NITE_DEV_LIBRARIES})

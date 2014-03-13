@@ -17,6 +17,7 @@ if($ENV{ROS_DISTRO} STREQUAL "groovy")
   add_definitions(-DUSE_PCL_AS_PCL_MSGS)
 endif()
 
-
+set(PC_NITE_DEV_LIBRARIES XnVNite_1_3_1;OpenNI)
 rosbuild_find_ros_package(openni_camera)
 rosbuild_add_executable(openni_scene src/openni_scene.cpp)
+target_link_libraries(openni_scene ${PC_NITE_DEV_LIBRARIES})

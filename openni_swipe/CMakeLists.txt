@@ -18,5 +18,6 @@ endif()
 rosbuild_add_executable(openni_swipe src/openni_swipe.cpp)
 
 # https://code.ros.org/trac/ros-pkg/ticket/5287
-target_link_libraries(openni_swipe XnVNite_1_3_1)
+set(PC_NITE_DEV_LIBRARIES XnVNite_1_3_1;OpenNI)
+target_link_libraries(openni_swipe ${PC_NITE_DEV_LIBRARIES})
 
