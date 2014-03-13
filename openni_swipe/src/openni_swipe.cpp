@@ -9,14 +9,14 @@ ros::Publisher swipe_status_pub;
 //
 
 //NITE
-#include <ni/XnOpenNI.h>
-#include <ni/XnCppWrapper.h>
-#include <ni/XnVHandPointContext.h>
-#include <ni/XnVSessionManager.h>
-#include <ni/XnVSwipeDetector.h>
-#include <ni/XnVSteadyDetector.h>
-#include <ni/XnVPushDetector.h>
-#include <ni/XnVWaveDetector.h>
+#include <XnOpenNI.h>
+#include <XnCppWrapper.h>
+#include <XnVHandPointContext.h>
+#include <XnVSessionManager.h>
+#include <XnVSwipeDetector.h>
+#include <XnVSteadyDetector.h>
+#include <XnVPushDetector.h>
+#include <XnVWaveDetector.h>
 
 // NITE objects
 XnVSessionManager* g_pSessionManager = NULL;

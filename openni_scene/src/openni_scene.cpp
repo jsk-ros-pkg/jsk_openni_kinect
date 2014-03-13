@@ -2,8 +2,8 @@
 #include <ros/ros.h>
 #include <ros/package.h>
 
-#include <ni/XnOpenNI.h>
-#include <ni/XnCppWrapper.h>
+#include <XnOpenNI.h>
+#include <XnCppWrapper.h>
 
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
