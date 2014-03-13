@@ -13,7 +13,8 @@
   <depend package="roslib"/>
   <depend package="libopenni-nite-dev"/>
   <depend package="std_msgs"/>
-
+  <depend package="pcl_msgs"/>
+  
   <rosdep name="roscpp"/>
   <rosdep name="roslib"/>
   <rosdep name="libopenni-nite-dev"/>
