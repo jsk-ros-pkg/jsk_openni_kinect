@@ -7,5 +7,13 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 rosbuild_init()
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
+set(PC_NITE_DEV_INCLUDE_DIRS "/usr/include/nite")
+find_package(PkgConfig)
+pkg_check_modules(PC_LIBOPENNI REQUIRED libopenni)
+nclude_directories(
+  ${PC_LIBOPENNI_INCLUDE_DIRS}
+  ${PC_NITE_DEV_INCLUDE_DIRS})
+
+
 rosbuild_find_ros_package(openni_camera)
 rosbuild_add_executable(openni_scene src/openni_scene.cpp)
