@@ -14,7 +14,8 @@ openni_pointer broadcasts the OpenNI hand position using tf.
   <depend package="geometry_msgs"/>
   <depend package="libopenni-nite-dev"/>
   <depend package="tf"/>
-
+  <depend package="pcl_msgs"/>
+    
   <rosdep name="roscpp"/>
   <rosdep name="roslib"/>
   <rosdep name="geometry_msgs"/>

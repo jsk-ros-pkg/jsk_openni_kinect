@@ -13,12 +13,13 @@ openni_scene broadcasts the OpenNI scene segmented point clouds.
   <depend package="roslib"/>
   <depend package="sensor_msgs"/>
   <depend package="pcl_ros"/>
-  <depend package="libopenni-nite-dev"/>
+  <depend package="pcl_msgs"/>
+  <!-- <depend package="libopenni-nite-dev"/> -->
 
   <rosdep name="roscpp"/>
   <rosdep name="roslib"/>
   <rosdep name="sensor_msgs"/>
   <rosdep name="pcl_ros"/>
   <rosdep name="libopenni-nite-dev"/>
-
+  <rosdep name="libopenni-dev" />
 </package>
