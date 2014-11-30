@@ -7,9 +7,9 @@ python:
 compiler:
   - gcc
 env:
-  - ROS_DISTRO=groovy ROSWS=rosws BUILDER=rosbuild BUILD_PACKAGES="jsk_openni_kinect kinect_near_mode_calibration openni_pointer openni_scene openni_swipe"
+#  - ROS_DISTRO=groovy ROSWS=rosws BUILDER=rosbuild BUILD_PACKAGES="jsk_openni_kinect kinect_near_mode_calibration openni_pointer openni_scene openni_swipe"
   - ROS_DISTRO=hydro ROSWS=wstool BUILDER=catkin
-  - ROS_DISTRO=groovy ROSWS=wstool BUILDER=catkin
+#  - ROS_DISTRO=groovy ROSWS=wstool BUILDER=catkin
 #notifications:
 #  email:
 #    recipients:
