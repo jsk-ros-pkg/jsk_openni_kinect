@@ -4,7 +4,7 @@ project(kinect_near_mode_calibration)
 
 # Load catkin and all dependencies required for this package
 # TODO: remove all from COMPONENTS that are not catkin packages.
-find_package(catkin REQUIRED COMPONENTS roscpp roslib openni_camera image_geometry)
+find_package(catkin REQUIRED COMPONENTS roscpp roslib openni_camera image_geometry cmake_modules)
 find_package(OpenCV REQUIRED)
 find_package(Eigen REQUIRED)
 
