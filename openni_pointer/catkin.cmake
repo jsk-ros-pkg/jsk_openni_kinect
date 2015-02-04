@@ -12,6 +12,11 @@ pkg_check_modules(PC_LIBOPENNI REQUIRED libopenni)
 set(PC_NITE_DEV_INCLUDE_DIRS "/usr/include/nite")
 set(PC_NITE_DEV_LIBRARIES XnVNite;OpenNI)
 
+if(NOT EXISTS PC_NITE_DEV_INCLUDE_DIRS)
+  message(WARNING "-- Nite is not found, so could not compile ${PROJECT_NAME}")
+  return()
+endif()
+
 # TODO: fill in what other packages will need to use this package
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
