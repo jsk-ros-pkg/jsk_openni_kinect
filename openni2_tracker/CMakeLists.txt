@@ -5,7 +5,7 @@ find_package(catkin REQUIRED COMPONENTS geometry_msgs
 					roscpp
 					roslib
 					tf)
-find_package(orocos_kdl)
+#find_package(orocos_kdl)
 # Find OpenNI2
 #find_package(PkgConfig)
 #pkg_check_modules(OpenNI2 REQUIRED libopenni2)
