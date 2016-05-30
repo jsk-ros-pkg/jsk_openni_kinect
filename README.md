@@ -9,7 +9,8 @@ jsk openni tools
 
 ### Create catkin workspace
 ```
-$ mkdir-p ~/catkin_ws/ws_jsk_openni_kinect/src
+$ mkdir -p ~/catkin_ws/ws_jsk_openni_kinect/src
+$ cd ~/catkin_ws/ws_jsk_openni_kinect
 $ cd ~/catkin_ws/ws_jsk_openni_kinect
 $ wstool init src
 $ wstool set jsk_openni_kinect https://github.com/jsk-ros-pkg/jsk_openni_kinect --git
