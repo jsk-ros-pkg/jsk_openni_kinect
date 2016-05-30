@@ -20,7 +20,8 @@ $ wstool update
 ### Install missing apt package required to run this package
 ```
 $ rosdep update
-$ rosdep install -r -y
+$ cd ~/catkin_ws/ws_jsk_openni_kinect
+$ rosdep install -r -y --from-paths src --ignore-src
 ```
 
 ### Create primesense-nite-nonfree and install
