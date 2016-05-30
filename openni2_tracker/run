@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd ~/NiTE-2.0.0/Redist
+exec $@
