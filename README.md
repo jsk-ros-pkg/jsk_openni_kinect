@@ -66,6 +66,11 @@ $ Bus ○○○ Device ○○○: ID 1d27:0601 ASUS
 ```
 If there is no device like "ASUS", the connected device seems to be broken.
 
+If you device has `1d27:0609`, you need to update `libopenni-sensor-primesense` deb package
+```
+rosrun jsk_openni_kinect apt-get-intall-libopenni-sensor-primesense.sh
+```
+
 ### Run NiViewer and check if you can run the device without NiTE function
 ```
 $ NiViewer
