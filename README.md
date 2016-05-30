@@ -9,8 +9,9 @@ jsk openni tools
 
 ### Create catkin workspace
 ```
-$ mkdir-p catkin_ws/ws_jsk_openni_kinect/src
-$ cd catkin_ws/ws_jsk_openni_kinect
+$ mkdir -p ~/catkin_ws/ws_jsk_openni_kinect/src
+$ cd ~/catkin_ws/ws_jsk_openni_kinect
+$ cd ~/catkin_ws/ws_jsk_openni_kinect
 $ wstool init src
 $ wstool set jsk_openni_kinect https://github.com/jsk-ros-pkg/jsk_openni_kinect --git
 $ wstool set openni_tracker https://github.com/ros-drivers/openni_tracker --git
@@ -20,7 +21,8 @@ $ wstool update
 ### Install missing apt package required to run this package
 ```
 $ rosdep update
-$ rosdep install -r -y
+$ cd ~/catkin_ws/ws_jsk_openni_kinect
+$ rosdep install -r -y --from-paths src --ignore-src
 ```
 
 ### Create primesense-nite-nonfree and install
