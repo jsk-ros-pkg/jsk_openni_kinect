@@ -14,6 +14,13 @@ $ cd catkin_ws/ws_jsk_openni_kinect
 $ wstool init src
 $ wstool set jsk_openni_kinect https://github.com/jsk-ros-pkg/jsk_openni_kinect --git
 $ wstool set openni_tracker https://github.com/ros-drivers/openni_tracker --git
+$ wstool update
+```
+
+### Install missing apt package required to run this package
+```
+$ rosdep update
+$ rosdep install -r -y
 ```
 
 ### Create primesense-nite-nonfree and install
@@ -42,7 +49,31 @@ $ cd catkin_ws/ws_jsk_openni_kinect
 $ catkin b
 ```
 
+### Run roslaunch and check if your device run correctly
+```
+$ roslaunch openni_launch openni.launch
+$ rosrun openni_tracker openni_tracker _camera_frame_id:=camera_depth_frame
+```
 
 
+## Troubleshooting
+### Run lsusb and check if your device correctly recognized by your OS
+```
+$ lsusb
+$ Bus ○○○ Device ○○○: ID 1d27:0601 ASUS
+```
+If there is no device like "ASUS", the connected device seems to be broken.
 
+### Run NiViewer and check if you can run the device without NiTE function
+```
+$ NiViewer
+```
+If you have some error with this command, I recommend you to try
+1. disconnect the device
+2. sudo service udev restart
+3. connect the device again
 
+### Run sample program in NITE-Bin-Dev-Linux-x64-v1.5.2.23/Samples/Bin
+```
+$ ./Sample-Players
+```
