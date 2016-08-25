@@ -11,10 +11,10 @@ jsk openni tools
 ```
 $ mkdir -p ~/catkin_ws/ws_jsk_openni_kinect/src
 $ cd ~/catkin_ws/ws_jsk_openni_kinect
-$ cd ~/catkin_ws/ws_jsk_openni_kinect
 $ wstool init src
-$ wstool set jsk_openni_kinect https://github.com/jsk-ros-pkg/jsk_openni_kinect --git
-$ wstool set openni_tracker https://github.com/ros-drivers/openni_tracker --git
+$ cd ~/catkin_ws/ws_jsk_openni_kinect/src
+$ wstool set jsk_openni_kinect https://github.com/jsk-ros-pkg/jsk_openni_kinect --git -y -u
+$ wstool set openni_tracker https://github.com/ros-drivers/openni_tracker --git -y -u
 $ wstool update
 ```
 
